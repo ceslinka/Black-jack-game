@@ -1,0 +1,8 @@
+flowchart LR
+    L[Lobby] -->|GET /tables| TL[Lista stołów]
+    TL -->|Wybór stołu| J[table.join WS]
+    J --> W{Czekaj na graczy}
+    W -->|Brak krupiera| WD[Czekaj na dealera]
+    WD --> W
+    W -->|Pełny stół + krupier| G[Gra rozpoczęta]
+    G --> UI[UI stołu]

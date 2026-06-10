@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> waiting : Stół utworzony
+    waiting --> in_game : Pełny stół + krupier
+    in_game --> betting : round.started
+    betting --> playing : Wszystkie zakłady przyjęte
+    playing --> player_turn : Karty rozdane
+    player_turn --> dealer_turn : Wszyscy stand/bust
+    dealer_turn --> settlement : Krupier zakończył
+    settlement --> waiting : round.settled + reset
+    waiting --> [*] : Stół usunięty

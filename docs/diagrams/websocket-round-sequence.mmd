@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant P as Gracz
+    participant WS as WebSocket Gateway
+    participant GE as Game Engine
+    participant DB as PostgreSQL
+
+    P->>WS: table.join {tableId, seatIndex}
+    WS->>GE: assignSeat()
+    GE-->>P: table.state
+
+    Note over GE: Stół zapełniony + krupier obecny
+    GE-->>P: round.started {roundId}
+
+    P->>WS: bet.place {amount}
+    WS->>GE: validateBet()
+    GE->>DB: UPDATE wallet — odejmij zakład
+    GE-->>P: bet.placed
+
+    GE->>GE: dealInitialCards()
+    GE-->>P: card.dealt
+    GE-->>P: player.turn
+
+    P->>WS: action.hit / action.stand
+    GE->>GE: dealerPlay()
+    GE-->>P: dealer.turn
+    GE-->>P: round.result
+    GE->>DB: UPDATE wallet — payout
+    GE-->>P: round.settled
+    GE-->>P: table.state {status: waiting}

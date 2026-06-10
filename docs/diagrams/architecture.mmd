@@ -1,0 +1,28 @@
+flowchart TB
+    subgraph Client["Klient (przeglądarka)"]
+        FE[React SPA]
+    end
+
+    subgraph Backend["Backend — Spring Boot"]
+        API[REST API]
+        WS[WebSocket Gateway]
+        GE[Game Engine]
+        AUTH[Auth Service — JWT]
+        WAL[Wallet Service]
+    end
+
+    subgraph Data["Warstwa danych"]
+        PG[(PostgreSQL)]
+    end
+
+    FE -->|HTTPS REST| API
+    FE -->|WSS| WS
+    API --> AUTH
+    API --> WAL
+    API --> GE
+    WS --> AUTH
+    WS --> GE
+    GE --> WAL
+    WAL --> PG
+    AUTH --> PG
+    API -->|OpenAPI| SWG[Swagger UI /api-docs]

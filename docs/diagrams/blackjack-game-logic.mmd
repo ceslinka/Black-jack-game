@@ -1,0 +1,25 @@
+flowchart TD
+    START[Rozpoczęcie rundy] --> DEAL[Rozdaj 2 karty]
+    DEAL --> CHECK_BJ{Gracz ma Blackjack?}
+    CHECK_BJ -->|Tak| PAYOUT_BJ[Wypłata 3:2]
+    CHECK_BJ -->|Nie| TURN[Tura gracza]
+    TURN --> ACTION{Akcja}
+    ACTION -->|Hit| HIT[Dodaj kartę]
+    HIT --> BUST{Wartość > 21?}
+    BUST -->|Tak| LOSE[Przegrana]
+    BUST -->|Nie| TURN
+    ACTION -->|Stand| NEXT{Następny gracz?}
+    ACTION -->|Double| DOUBLE[Bet x2, 1 karta]
+    DOUBLE --> BUST
+    ACTION -->|Split| SPLIT[2 ręce]
+    SPLIT --> TURN
+    NEXT -->|Tak| TURN
+    NEXT -->|Nie| DEALER[Krupier dobiera do >= 17]
+    DEALER --> COMPARE[Porównaj z krupierem]
+    COMPARE --> WIN[Wygrana 1:1]
+    COMPARE --> LOSE
+    COMPARE --> PUSH[Remis — zwrot]
+    PAYOUT_BJ --> END[Koniec rundy]
+    WIN --> END
+    LOSE --> END
+    PUSH --> END
