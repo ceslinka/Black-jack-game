@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: blackjack-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/blackjack
+    username: blackjack
+    password: blackjack
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: change-me-in-production-use-at-least-32-characters-long-secret-key
+    expiration-hours: 24
+  wallet:
+    initial-balance: 1000

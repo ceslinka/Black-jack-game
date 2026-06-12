@@ -6,7 +6,8 @@ Wszystkie istotne zmiany w projekcie dokumentowane w tym pliku.
 
 ### Added
 
-- (tu wpisywać nowe funkcje po implementacji)
+- M6–M10: start rundy, zakłady, logika Blackjack, payout, frontend React
+- GameRoundService, encje Round/Bet/Hand, UI stołu
 
 ### Fixed
 
