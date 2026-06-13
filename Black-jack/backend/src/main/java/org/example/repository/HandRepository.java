@@ -14,4 +14,6 @@ public interface HandRepository extends JpaRepository<Hand, UUID> {
     Optional<Hand> findByRoundIdAndUserId(UUID roundId, UUID userId);
 
     Optional<Hand> findFirstByRoundIdAndStatusOrderBySeatIndexAsc(UUID roundId, HandStatus status);
+
+    void deleteByRoundId(UUID roundId);
 }

@@ -13,4 +13,6 @@ public interface BetRepository extends JpaRepository<Bet, UUID> {
     List<Bet> findByRoundId(UUID roundId);
 
     long countByRoundId(UUID roundId);
+
+    void deleteByRoundId(UUID roundId);
 }

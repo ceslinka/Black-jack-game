@@ -13,11 +13,13 @@ export function isRed(code) {
   return code && code.length === 2 && RED.includes(code.charAt(1))
 }
 
-export default function CardView({ code }) {
+export default function CardView({ code, animate = false }) {
   if (!code) return null
   const hidden = code === '**'
   return (
-    <span className={`playing-card ${hidden ? 'hidden' : isRed(code) ? 'red' : ''}`}>
+    <span
+      className={`playing-card ${hidden ? 'hidden' : isRed(code) ? 'red' : ''} ${animate ? 'deal-animate' : ''}`}
+    >
       {hidden ? '🂠' : formatCard(code)}
     </span>
   )

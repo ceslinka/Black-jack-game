@@ -15,7 +15,7 @@ public final class CardCodec {
     private CardCodec() {}
 
     public static String encode(Card card) {
-        return rankCode(card.getRank()) + suitCode(card.getSuit());
+        return String.valueOf(rankCode(card.getRank())) + suitCode(card.getSuit());
     }
 
     public static Card decode(String code) {

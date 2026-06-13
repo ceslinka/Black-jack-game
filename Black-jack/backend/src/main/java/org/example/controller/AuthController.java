@@ -29,12 +29,6 @@ public class AuthController {
         return authService.register(request, UserRole.player);
     }
 
-    @PostMapping("/register-dealer")
-    @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse registerDealer(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request, UserRole.dealer);
-    }
-
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);

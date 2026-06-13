@@ -1,0 +1,6 @@
+org\example\AuthIntegrationTest.class
+org\example\IntegrationTestBase.class
+org\example\TableIntegrationTest.class
+org\example\TableJoinServiceTest.class
+org\example\DealerRequirementTest.class
+org\example\game\HandCalculatorTest.class

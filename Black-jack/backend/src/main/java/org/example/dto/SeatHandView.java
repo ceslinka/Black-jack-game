@@ -11,5 +11,4 @@ public record SeatHandView(
         List<String> cards,
         Integer handValue,
         String handStatus,
-        Integer bet,
-        boolean dealer) {}
+        Integer bet) {}

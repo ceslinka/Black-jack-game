@@ -2,4 +2,4 @@ package org.example.dto;
 
 import java.util.UUID;
 
-public record TableJoinMessage(UUID tableId, int seatIndex, boolean asDealer) {}
+public record TableJoinMessage(UUID tableId, int seatIndex) {}

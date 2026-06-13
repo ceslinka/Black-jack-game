@@ -16,6 +16,8 @@ public interface TableSeatRepository extends JpaRepository<TableSeat, UUID> {
 
     Optional<TableSeat> findByGameTableIdAndUserId(UUID tableId, UUID userId);
 
+    Optional<TableSeat> findByUserId(UUID userId);
+
     @Query("SELECT COUNT(s) FROM TableSeat s WHERE s.gameTable.id = :tableId AND s.user IS NOT NULL AND s.dealer = false")
     long countOccupiedPlayerSeats(@Param("tableId") UUID tableId);
 

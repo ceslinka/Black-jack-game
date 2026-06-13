@@ -28,21 +28,30 @@ Symulator gry Blackjack w formie kasyna on-line w czasie rzeczywistym.
 | M1 | Rejestracja i logowanie (JWT) | MUST | ✅ |
 | M2 | Portfel użytkownika (start: 1000 żetonów) | MUST | ✅ |
 | M3 | Lobby ze stołami | MUST | ✅ |
-| M4 | Dołączanie do stołu (WebSocket) | MUST | ✅ |
+| M4 | Dołączanie do stołu (REST + WebSocket) | MUST | ✅ |
 | M5 | Wymóg krupiera przy stole | MUST | ✅ |
-| M6 | Start gry po zapełnieniu stołu | MUST | ✅ |
+| M6 | Start gry (≥1 gracz + krupier) | MUST | ✅ |
 | M7 | Obstawianie zakładów | MUST | ✅ |
 | M8 | Logika Blackjack (hit / stand) | MUST | ✅ |
 | M9 | Rozliczenie i wypłata (payout) | MUST | ✅ |
-| M10 | UI stołu (karty, przyciski) | MUST | ✅ |
+| M10 | UI stołu (karty, animacje, przerwa między rundami) | MUST | ✅ |
 | S1 | Double down | SHOULD | ⬜ |
 | S2 | Split | SHOULD | ⬜ |
 | S3 | Swagger UI (`/api-docs`) | SHOULD | ⬜ |
 | S4 | Rate limiting | SHOULD | ⬜ |
-| S5 | Historia rund | SHOULD | ⬜ |
+| S5 | Historia rund | SHOULD | ✅ |
 | S6 | Konta krupierów | SHOULD | ✅ |
 
 **Legenda statusu:** ⬜ — nie zrobione · 🟡 — w trakcie · ✅ — gotowe
+
+## Ostatnie zmiany (przed push)
+
+- **Kill switch** — po restarcie backendu (Maven) uszkodzona sesja stołu jest cicho resetowana: saldo wraca do ostatniego kamienia milowego (po poprawnie zakończonej grze), gracze są rozłączani ze stołu, stół wraca do `waiting`
+- **Historia gier** — zakładka „Historia” w lobby: gracze widzą wyniki, saldo przed/po; krupier widzi zmiany przy stołach i liczbę rozegranych rund
+- Animacje kart, przerwa 10 s między rundami, start od 1 gracza + krupier
+- WebSocket + polling REST, naprawione SockJS i synchronizacja
+
+Szczegóły: [CHANGELOG.md](CHANGELOG.md)
 
 ## Struktura repozytorium
 
@@ -98,7 +107,7 @@ mvn test
 
 ## Jak przetestować grę (krok po kroku)
 
-Stoły mają **2 miejsca dla graczy** + krupier. Do pełnej gry potrzeba **3 kont** (2 graczy + 1 krupier).
+Stoły mają **do 2 miejsc dla graczy** + krupier. Minimum do gry: **1 gracz + krupier** (drugi gracz opcjonalny).
 
 ### Krok 1 — Uruchom wszystko
 
@@ -106,41 +115,31 @@ Stoły mają **2 miejsca dla graczy** + krupier. Do pełnej gry potrzeba **3 kon
 2. Backend: `mvn spring-boot:run` w `Black-jack/backend`
 3. Frontend: `npm run dev` w `Black-jack/frontend`
 
-### Krok 2 — Utwórz konta (3 okna przeglądarki / tryb incognito)
+### Krok 2 — Utwórz konta
 
 | Konto | Rola | Jak utworzyć |
 |-------|------|--------------|
-| Gracz 1 | player | Rejestracja na http://localhost:5173 |
-| Gracz 2 | player | Rejestracja (inna przeglądarka/incognito) |
+| Gracz | player | Rejestracja na http://localhost:5173 |
 | Krupier | dealer | Rejestracja z zaznaczonym „Konto krupiera” |
+
+Opcjonalnie drugi gracz (inna przeglądarka / incognito).
 
 Hasło: min. 8 znaków, np. `Secret1!`
 
-### Krok 3 — Dołącz do tego samego stołu
+### Krok 3 — Dołącz do stołu
 
-1. Każde konto → **Lobby** → **Wejdź** na ten sam stół (np. „Stół VIP”)
-2. Gracz 1 → **Miejsce 0**
-3. Gracz 2 → **Miejsce 1**
-4. Krupier → **Usiądź jako krupier**
+1. Gracz → **Lobby** → **Wejdź** na stół (np. „Stół VIP”) → **Miejsce 0**
+2. Krupier → ten sam stół → **Usiądź jako krupier**
 
-Gdy stół pełny + krupier → automatycznie startuje runda (`round.started`).
+Gdy jest ≥1 gracz + krupier → startuje runda.
 
-### Krok 4 — Obstawianie
+### Krok 4 — Obstawianie i gra
 
-Każdy gracz wpisuje kwotę (np. `10`) i klika **Obstaw**.  
-Limit: min. zakład stołu ≤ kwota ≤ max. zakład i ≤ 25% salda.
+Gracz wybiera kwotę i klika **Obstaw**. Po rozdaniu kart — **Hit** / **Stand**. Krupier dobiera animacyjnie do 17.
 
-Gdy obaj postawią → rozdawane są karty.
+### Krok 5 — Koniec rundy
 
-### Krok 5 — Gra
-
-Gracz z aktywną turą (podświetlone miejsce) klika **Hit** lub **Stand**.  
-Po turze wszystkich graczy krupier dobiera do 17.
-
-### Krok 6 — Wynik
-
-Na dole stołu pojawia się **Wynik rundy** (win/lose/push + payout).  
-Saldo żetonów aktualizuje się automatycznie.
+Podświetlenie zwycięzcy (Ty lub krupier), potem **przerwa 10 s** z wyborem zakładu na następną rundę.
 
 ## Dokumentacja
 

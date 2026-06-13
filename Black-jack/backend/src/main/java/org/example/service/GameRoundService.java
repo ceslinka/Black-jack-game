@@ -40,6 +40,7 @@ import org.example.repository.RoundRepository;
 import org.example.repository.TableSeatRepository;
 import org.example.repository.UserRepository;
 import org.example.repository.WalletTransactionRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +58,8 @@ public class GameRoundService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final DeckService deckService;
     private final TableEventPublisher eventPublisher;
+    private final TableService tableService;
+    private final GameHistoryService gameHistoryService;
 
     private final Map<UUID, List<Card>> roundDecks = new ConcurrentHashMap<>();
 
@@ -69,7 +72,9 @@ public class GameRoundService {
             UserRepository userRepository,
             WalletTransactionRepository walletTransactionRepository,
             DeckService deckService,
-            TableEventPublisher eventPublisher) {
+            TableEventPublisher eventPublisher,
+            @Lazy TableService tableService,
+            GameHistoryService gameHistoryService) {
         this.gameTableRepository = gameTableRepository;
         this.roundRepository = roundRepository;
         this.betRepository = betRepository;
@@ -79,6 +84,8 @@ public class GameRoundService {
         this.walletTransactionRepository = walletTransactionRepository;
         this.deckService = deckService;
         this.eventPublisher = eventPublisher;
+        this.tableService = tableService;
+        this.gameHistoryService = gameHistoryService;
     }
 
     @Transactional
@@ -92,7 +99,7 @@ public class GameRoundService {
         }
 
         long players = tableSeatRepository.countOccupiedPlayerSeats(tableId);
-        if (players < table.getMaxPlayers() || !tableSeatRepository.existsOccupiedDealerSeat(tableId)) {
+        if (players < 1) {
             return;
         }
 
@@ -156,7 +163,13 @@ public class GameRoundService {
 
         long expectedBets = tableSeatRepository.countOccupiedPlayerSeats(tableId);
         if (betRepository.countByRoundId(round.getId()) >= expectedBets) {
-            dealInitialCards(round);
+            Round lockedRound = roundRepository
+                    .findByIdForUpdate(round.getId())
+                    .orElseThrow(() -> new ApiException("NOT_FOUND", "Round not found"));
+            if (lockedRound.getStatus() == RoundStatus.betting) {
+                dealInitialCards(lockedRound);
+            }
+            round = lockedRound;
         }
 
         publishGameState(round, round.getStatus() == RoundStatus.playing ? "player_turn" : "betting");
@@ -174,12 +187,21 @@ public class GameRoundService {
         cards.add(drawCard(round.getId()));
         updateHandCards(hand, cards);
 
+        eventPublisher.publishToTable(
+                tableId,
+                new CardDealtEvent(
+                        "card.dealt",
+                        tableId,
+                        "player-" + hand.getSeatIndex(),
+                        CardCodec.toCodes(cards),
+                        false));
+
         if (hand.getStatus() == HandStatus.bust) {
             advanceAfterHandFinished(round, hand);
         } else {
             publishPlayerTurn(round, hand);
+            publishGameState(round, "player_turn");
         }
-        publishGameState(round, "player_turn");
     }
 
     @Transactional
@@ -195,6 +217,9 @@ public class GameRoundService {
     }
 
     private void dealInitialCards(Round round) {
+        if (round.getStatus() != RoundStatus.betting) {
+            return;
+        }
         UUID tableId = round.getGameTable().getId();
         List<TableSeat> playerSeats = tableSeatRepository.findByGameTableIdOrderBySeatIndex(tableId).stream()
                 .filter(s -> s.getUser() != null && !s.isDealer())
@@ -265,6 +290,7 @@ public class GameRoundService {
 
     private void runDealerAndSettle(Round round) {
         UUID tableId = round.getGameTable().getId();
+        GameTable table = round.getGameTable();
         List<String> dealerCodes = CardCodec.fromJson(round.getDealerCardsJson());
         List<Card> dealerCards = CardCodec.fromCodes(dealerCodes);
 
@@ -320,6 +346,14 @@ public class GameRoundService {
                 locked.setBalance(locked.getBalance() + payout);
                 userRepository.save(locked);
                 recordTransaction(locked, payout, TransactionType.payout, round.getId());
+                gameHistoryService.recordPlayerRound(
+                        locked, table, round.getId(), outcome, bet.getAmount(), payout);
+            } else {
+                User locked = userRepository
+                        .findByIdForUpdate(hand.getUser().getId())
+                        .orElseThrow();
+                gameHistoryService.recordPlayerRound(
+                        locked, table, round.getId(), outcome, bet.getAmount(), payout);
             }
 
             bet.setStatus(BetStatus.settled);
@@ -337,20 +371,68 @@ public class GameRoundService {
         eventPublisher.publishToTable(
                 tableId, new RoundSettledEvent("round.settled", tableId, round.getId(), results));
 
-        GameTable table = round.getGameTable();
-        table.setStatus(TableStatus.waiting);
-        gameTableRepository.save(table);
-
         roundDecks.remove(round.getId());
         publishGameState(round, "settled");
+        tableService.beginIntermission(tableId);
+    }
+
+    @Transactional
+    public void abortRoundIfBetting(UUID tableId) {
+        Round round = roundRepository
+                .findFirstByGameTableIdAndStatusOrderByStartedAtDesc(tableId, RoundStatus.betting)
+                .orElse(null);
+        if (round == null) {
+            throw new ApiException("FORBIDDEN", "Cannot leave during active game");
+        }
+        round.setStatus(RoundStatus.settled);
+        round.setEndedAt(java.time.Instant.now());
+        roundRepository.save(round);
+        roundDecks.remove(round.getId());
+
+        GameTable table = gameTableRepository.findById(tableId).orElseThrow();
+        table.setStatus(TableStatus.waiting);
+        gameTableRepository.save(table);
+    }
+
+    @Transactional(readOnly = true)
+    public GameStateEvent getGameState(UUID tableId) {
+        GameTable table = gameTableRepository
+                .findById(tableId)
+                .orElseThrow(() -> new ApiException("NOT_FOUND", "Table not found"));
+
+        Round round = roundRepository
+                .findFirstByGameTableIdAndStatusOrderByStartedAtDesc(tableId, RoundStatus.betting)
+                .or(() -> roundRepository.findFirstByGameTableIdAndStatusOrderByStartedAtDesc(tableId, RoundStatus.playing))
+                .orElse(null);
+
+        if (round == null && (table.getStatus() == TableStatus.waiting || table.getStatus() == TableStatus.settlement)) {
+            round = roundRepository
+                    .findFirstByGameTableIdAndStatusOrderByStartedAtDesc(tableId, RoundStatus.settled)
+                    .orElse(null);
+        }
+
+        if (round == null) {
+            return null;
+        }
+        String phase =
+                switch (round.getStatus()) {
+                    case betting -> "betting";
+                    case playing -> "player_turn";
+                    default -> "settled";
+                };
+        return buildGameStateEvent(round, phase);
     }
 
     private void publishGameState(Round round, String phase) {
+        eventPublisher.publishToTable(round.getGameTable().getId(), buildGameStateEvent(round, phase));
+    }
+
+    private GameStateEvent buildGameStateEvent(Round round, String phase) {
         UUID tableId = round.getGameTable().getId();
         List<SeatHandView> seats = new ArrayList<>();
 
         for (TableSeat seat : tableSeatRepository.findByGameTableIdOrderBySeatIndex(tableId)) {
-            if (seat.getUser() == null) {
+            if (seat.getUser() == null || seat.isDealer()) {
                 continue;
             }
             Integer betAmount = null;
@@ -382,25 +464,22 @@ public class GameRoundService {
                     cards,
                     handValue,
                     handStatus,
-                    betAmount,
-                    seat.isDealer()));
+                    betAmount));
         }
 
         List<String> dealerCards = round.getStatus() == RoundStatus.betting
                 ? List.of()
                 : maskDealerCards(round);
 
-        eventPublisher.publishToTable(
+        return new GameStateEvent(
+                "game.state",
                 tableId,
-                new GameStateEvent(
-                        "game.state",
-                        tableId,
-                        round.getId(),
-                        phase,
-                        round.getCurrentSeatIndex(),
-                        seats,
-                        dealerCards,
-                        round.isDealerHidden()));
+                round.getId(),
+                phase,
+                round.getCurrentSeatIndex(),
+                seats,
+                dealerCards,
+                round.isDealerHidden());
     }
 
     private List<String> maskDealerCards(Round round) {
@@ -453,11 +532,15 @@ public class GameRoundService {
     }
 
     private Card drawCard(UUID roundId) {
-        List<Card> deck = roundDecks.get(roundId);
-        if (deck == null || deck.isEmpty()) {
-            throw new ApiException("INTERNAL_ERROR", "Deck exhausted");
+        List<Card> deck = ensureRoundDeck(roundId);
+        if (deck.isEmpty()) {
+            deck.addAll(deckService.createShuffledDeck());
         }
         return deck.removeFirst();
+    }
+
+    private List<Card> ensureRoundDeck(UUID roundId) {
+        return roundDecks.computeIfAbsent(roundId, id -> deckService.createShuffledDeck());
     }
 
     private void validateBetAmount(User user, GameTable table, int amount) {
@@ -473,12 +556,9 @@ public class GameRoundService {
     }
 
     private void ensurePlayerSeated(UUID tableId, UUID userId) {
-        TableSeat seat = tableSeatRepository
+        tableSeatRepository
                 .findByGameTableIdAndUserId(tableId, userId)
                 .orElseThrow(() -> new ApiException("FORBIDDEN", "Not seated at this table"));
-        if (seat.isDealer()) {
-            throw new ApiException("FORBIDDEN", "Dealer cannot place bets");
-        }
     }
 
     private Round getBettingRound(UUID tableId) {

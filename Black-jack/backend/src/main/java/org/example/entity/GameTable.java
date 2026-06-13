@@ -38,6 +38,9 @@ public class GameTable {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "intermission_ends_at")
+    private Instant intermissionEndsAt;
+
     public UUID getId() {
         return id;
     }
@@ -92,5 +95,13 @@ public class GameTable {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Instant getIntermissionEndsAt() {
+        return intermissionEndsAt;
+    }
+
+    public void setIntermissionEndsAt(Instant intermissionEndsAt) {
+        this.intermissionEndsAt = intermissionEndsAt;
     }
 }

@@ -6,7 +6,6 @@ export default function LoginPage() {
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isDealer, setIsDealer] = useState(false)
   const [registerMode, setRegisterMode] = useState(false)
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
@@ -15,13 +14,8 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     try {
-      let data
-      if (registerMode) {
-        const body = { email, password, username }
-        data = isDealer ? await api.registerDealer(body) : await api.register(body)
-      } else {
-        data = await api.login({ email, password })
-      }
+      const body = { email, password, username }
+      const data = registerMode ? await api.register(body) : await api.login({ email, password })
       setAuth(data.token, data.userId)
       nav('/lobby')
     } catch (err) {
@@ -46,13 +40,6 @@ export default function LoginPage() {
           <p>
             <input type="password" placeholder="Hasło (min 8)" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </p>
-          {registerMode && (
-            <p>
-              <label>
-                <input type="checkbox" checked={isDealer} onChange={(e) => setIsDealer(e.target.checked)} /> Konto krupiera
-              </label>
-            </p>
-          )}
           {error && <p className="error">{error}</p>}
           <button type="submit">{registerMode ? 'Zarejestruj' : 'Zaloguj'}</button>
           <button type="button" className="secondary" onClick={() => setRegisterMode(!registerMode)}>

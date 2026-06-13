@@ -1,5 +1,6 @@
 package org.example.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.example.entity.TableStatus;
 
@@ -10,4 +11,5 @@ public record TableResponse(
         int currentPlayers,
         TableStatus status,
         int minBet,
-        int maxBet) {}
+        int maxBet,
+        Instant intermissionEndsAt) {}
